@@ -1,0 +1,6 @@
+[submodule "src/leakres-aead-host/mbedtls.git"]
+	path = src/leakres-aead-host/mbedtls.git
+	url = https://github.com/ARMmbed/mbedtls.git
+[submodule "ip_repo/fuzzy-key-commit.git"]
+	path = ip_repo/fuzzy-key-commit.git
+	url = https://innersource.qub.ac.uk/opensource/fuzzy-key-commitment.git
