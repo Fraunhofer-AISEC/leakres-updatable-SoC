@@ -1,0 +1,108 @@
+7a8,9
+> 		KEY_CNT_G 		: integer := 2;
+> 		BLOCK_LENGTH_G : integer := 128;
+19c21,28
+< 
+---
+> 		trigger			: out std_logic;
+> 		-- ICAP interface
+> 		icap_tdata      : out std_logic_vector(31 downto 0);
+> 		icap_abort      : out std_logic;
+> 		icap_tvalid     : out std_logic;
+> 		icap_tready     : in std_logic;
+> 		-- FE interface
+> 		fe_key          : in std_logic_vector(255 downto 0);
+53a63
+> 		KEY_CNT_G_INIT 		: integer;
+57a68,78
+> 		trigger			: out std_logic;
+> 		fe_key         : in std_logic_vector(255 downto 0);
+> 	  -- FIFO interface
+> 		fifo_data   : out std_logic_vector(127 downto 0);
+> 		fifo_data_stb : out std_logic;
+> 		fifo_ready    : in std_logic;
+> 		fifo_tag_valid : out std_logic;
+> 		fifo_tag_valid_stb : out std_logic;
+> 		fifo_reset : out std_logic;
+> 		fifo_empty     : in std_logic;
+> 		fifo_error     : in std_logic;
+80a102,136
+> 	
+> 	component icap_fifo_buffer is
+> 		generic (
+> 		BYTES_PER_BLOCK_gen   : integer  -- must align to a multiple of 4, if not it is rounded up
+> 	);
+> 	port (
+> 		 -- system ports
+> 			 clk			   : in std_logic;
+> 			 rst           	   : in std_logic;  -- low active, synchronous to clk
+> 		 -- icap controller interface
+> 			 icap_tdata        : out std_logic_vector(31 downto 0);
+> 			 icap_abort        : out std_logic;
+> 			 icap_tvalid       : out std_logic;
+> 			 icap_tready       : in std_logic;
+> 		 -- AES interface
+> 			 aes_data          : in std_logic_vector(127 downto 0);
+> 			 aes_data_stb      : in std_logic;
+> 			 aes_ready         : out std_logic;
+> 			 aes_tag_valid     : in std_logic;
+> 			 aes_tag_invalid   : in std_logic;
+> 			 aes_error         : out std_logic;
+> 			 aes_empty         : out std_logic
+> 		 );
+> 	end component icap_fifo_buffer;
+> 
+> 	signal aes_data_s        : std_logic_vector(127 downto 0);
+> 	signal aes_data_stb_s    : std_logic;
+> 	signal aes_ready_s       : std_logic;
+> 	signal aes_tag_valid_s   : std_logic;
+> 	signal aes_tag_invalid_s : std_logic;
+> 	signal aes_error_s       : std_logic;
+> 	signal aes_empty_s       : std_logic;
+> 	signal fifo_tag_valid_s  : std_logic;
+> 	signal fifo_tag_valid_stb_s : std_logic;
+> 	signal fifo_reset_s : std_logic;
+86a143
+> 		KEY_CNT_G_INIT => KEY_CNT_G,
+90a148,158
+> 		trigger		  => trigger,
+> 		fe_key        => fe_key,
+> 	   -- FIFO interface
+> 		fifo_data      => aes_data_s,
+> 		fifo_data_stb  => aes_data_stb_s,
+> 		fifo_ready     => aes_ready_s,
+> 		fifo_tag_valid => fifo_tag_valid_s,
+> 		fifo_tag_valid_stb => fifo_tag_valid_stb_s,
+> 		fifo_reset	   => fifo_reset_s,
+> 		fifo_empty     => aes_empty_s,
+> 		fifo_error     => aes_error_s,
+115c183,209
+< 
+---
+> 	icap_fifo_buffer_inst : icap_fifo_buffer
+> 	generic map (
+> 					BYTES_PER_BLOCK_gen  => BLOCK_LENGTH_G
+> 				)
+> 	port map (
+> 		 -- system ports
+> 				 clk               => s00_axi_aclk,
+> 				 rst               => s00_axi_aresetn and not fifo_reset_s,
+> 		 -- icap controller interface
+> 				 icap_tdata        => icap_tdata,
+> 				 icap_abort        => icap_abort,
+> 				 icap_tvalid       => icap_tvalid,
+> 				 icap_tready       => icap_tready,
+> 		 -- AES interface
+> 				 aes_data          => aes_data_s,
+> 				 aes_data_stb      => aes_data_stb_s,
+> 				 aes_ready         => aes_ready_s,
+> 				 aes_tag_valid     => aes_tag_valid_s,
+> 				 aes_tag_invalid   => aes_tag_invalid_s,
+> 				 aes_error         => aes_error_s,
+> 				 aes_empty         => aes_empty_s
+> 			 );
+> 
+> 
+> 	-- Generate tag_valid and tag_invalid signals for FIFO controls
+> 	aes_tag_valid_s <= fifo_tag_valid_s and fifo_tag_valid_stb_s;
+> 	aes_tag_invalid_s <= not fifo_tag_valid_s when fifo_tag_valid_stb_s = '1' else '0';

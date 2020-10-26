@@ -1,0 +1,7 @@
+*.swp
+*.log
+.Xil/
+*.jou
+*.str
+vivado_project/
+checkpoints/

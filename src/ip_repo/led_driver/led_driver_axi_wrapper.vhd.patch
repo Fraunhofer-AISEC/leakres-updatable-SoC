@@ -1,0 +1,40 @@
+5c5
+< entity led_driver_axi_v1_0 is
+---
+> entity led_driver_axi_wrapper is
+18a19
+> 		led : out std_logic_vector(7 downto 0);
+47c48
+< end led_driver_axi_v1_0;
+---
+> end led_driver_axi_wrapper;
+49c50
+< architecture arch_imp of led_driver_axi_v1_0 is
+---
+> architecture led_driver_axi_wrapper_imp of led_driver_axi_wrapper is
+52c53
+< 	component led_driver_axi_v1_0_S00_AXI is
+---
+> 	component led_driver_axi is
+53a55,56
+> 		CONFIGURATION_ID     : integer;
+> 		DISPLAYED_BYTE       : integer;
+57a61
+> 		led : out std_logic_vector(7 downto 0);
+80c84
+< 	end component led_driver_axi_v1_0_S00_AXI;
+---
+> 	end component led_driver_axi;
+85c89
+< led_driver_axi_v1_0_S00_AXI_inst : led_driver_axi_v1_0_S00_AXI
+---
+> led_driver_axi_inst : led_driver_axi
+86a91,92
+> 		CONFIGURATION_ID     => 0,
+> 		DISPLAYED_BYTE       => 0,
+90a97
+> 	   led            => led,
+118c125
+< end arch_imp;
+---
+> end led_driver_axi_wrapper_imp;

@@ -1,0 +1,42 @@
+5c5
+< entity led_driver_axi_v1_0_S00_AXI is
+---
+> entity led_driver_axi is
+8a9,10
+> 		CONFIGURATION_ID     : integer   := 0;
+>       	DISPLAYED_BYTE       : integer   := 0;
+19a22
+> 		led : out std_logic_vector(7 downto 0);
+84c87
+< end led_driver_axi_v1_0_S00_AXI;
+---
+> end led_driver_axi;
+86c89
+< architecture arch_imp of led_driver_axi_v1_0_S00_AXI is
+---
+> architecture led_driver_axi_imp of led_driver_axi is
+213a217
+> 	  slv_reg0 <= std_logic_vector(to_unsigned(CONFIGURATION_ID, 32));
+216d219
+< 	      slv_reg0 <= (others => '0');
+225,231d227
+< 	            for byte_index in 0 to (C_S_AXI_DATA_WIDTH/8-1) loop
+< 	              if ( S_AXI_WSTRB(byte_index) = '1' ) then
+< 	                -- Respective byte enables are asserted as per write strobes                   
+< 	                -- slave registor 0
+< 	                slv_reg0(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
+< 	              end if;
+< 	            end loop;
+257d252
+< 	            slv_reg0 <= slv_reg0;
+386a382,387
+> 	process (S_AXI_ACLK) is
+> 	begin
+> 	  if (rising_edge(S_AXI_ACLK)) then
+> 	     led <= slv_reg0((8*(DISPLAYED_BYTE+1))-1 downto 8*DISPLAYED_BYTE);
+> 	  end if;
+> 	end process;
+390c391
+< end arch_imp;
+---
+> end led_driver_axi_imp;

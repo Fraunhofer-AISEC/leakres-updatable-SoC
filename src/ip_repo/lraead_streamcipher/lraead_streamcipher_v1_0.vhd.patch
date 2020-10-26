@@ -1,0 +1,45 @@
+7a8
+> 				KEY_CNT_G 		: integer := 2;
+19c20,27
+< 
+---
+> 		trigger			: out std_logic;
+> 		-- ICAP interface
+> 		icap_tdata      : out std_logic_vector(31 downto 0);
+> 		icap_abort      : out std_logic;
+> 		icap_tvalid     : out std_logic;
+> 		icap_tready     : in std_logic;
+> 		-- FE interface
+> 		fe_key          : in std_logic_vector(255 downto 0);
+53a62
+> 		KEY_CNT_G_INIT		: integer;
+57a67,73
+> 		trigger			: out std_logic;
+> 		fe_key         : in std_logic_vector(255 downto 0);
+> 		 -- icap controller interface
+> 		icap_tdata_o        : out std_logic_vector(31 downto 0);
+> 		icap_abort_o        : out std_logic;
+> 		icap_tvalid_o       : out std_logic;
+> 		icap_tready_i       : in std_logic;
+81a98,108
+> 	signal aes_data_s        : std_logic_vector(127 downto 0);
+> 	signal aes_data_stb_s    : std_logic;
+> 	signal aes_ready_s       : std_logic;
+> 	signal aes_tag_valid_s   : std_logic;
+> 	signal aes_tag_invalid_s : std_logic;
+> 	signal aes_error_s       : std_logic;
+> 	signal aes_empty_s       : std_logic;
+> 	signal icap_tdata_o    : std_logic_vector(31 downto 0);
+> 	signal icap_abort_o    : std_logic;
+> 	signal icap_tvalid_o   : std_logic;
+> 	signal icap_tready_i   : std_logic;
+86a114
+> 		KEY_CNT_G_INIT => KEY_CNT_G,
+90a119,125
+> 		trigger			=> trigger,
+> 		fe_key        => fe_key,
+> 		 -- icap controller interface
+> 		icap_tdata_o        => icap_tdata,
+> 		icap_abort_o        => icap_abort,
+> 		icap_tvalid_o       => icap_tvalid,
+> 		icap_tready_i       => icap_tready,

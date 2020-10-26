@@ -1,0 +1,440 @@
+3a4,47
+> ------------- Register mapping -----------------
+> --
+> -- Register 
+> -- 1.  slv_reg0 -> control_reg (32 bit)
+> --     0: mode   '0' encryption, '1' decryption
+> --     1: start  '0' not active, '1' start computation
+> --     2: reset  '0' nothing, '1' soft reset to clear all registers
+> --     3: tag  '0' data in in_reg is no valid tag, '1' data in reg is tag
+> --     4: prf_mode  '0' streamcipher mode, '1' standalone mode
+> --     5: key validity '0' external key (PUF) is invalid   '1' external key (PUF) is valid
+> --     6: load key   '0' not active   '1' load new key
+> --     7: load iv    '0' not active   '1' load iv      
+> -- 2.  slv_reg1 -> status_reg
+> --     0: done   '0', not computed, '1' computation done, result ready
+> --     1: busy   '0' idle. '1' busy
+> --     2: tag valid    '0' tag not valid   '1' tag valid
+> --     3: error    '0' no error   '1' error
+> --     4: fifo empty    '0' not empty   '1' empty
+> ----------  128 bit plaintext -------------------
+> -- 3.  slv_reg2 -> in_reg0
+> -- 4.  slv_reg3 -> in_reg1
+> -- 5.  slv_reg4 -> in_reg2
+> -- 6.  slv_reg5 -> in_reg3
+> ----------  128 bit iv -------------------
+> -- 7. slv_reg6 -> iv_reg0
+> -- 8. slv_reg7 -> iv_reg1
+> -- 9. slv_reg8 -> iv_reg2
+> -- 10.slv_reg9 ->  iv_reg3
+> ----------   128 bit ciphertext -------------------
+> -- 11. slv_reg10 -> out_reg0
+> -- 12. slv_reg11 -> out_reg1
+> -- 13. slv_reg12 -> out_reg2
+> -- 14. slv_reg13 -> out_reg3
+> ----------  128/256 bit key (set via control bit) -------------------
+> -- 15. slv_reg14 -> key_reg0
+> -- 16. slv_reg15 -> key_reg1
+> -- 17. slv_reg16 -> key_reg2
+> -- 18. slv_reg17 -> key_reg3
+> -- 19. slv_reg18 -> key_reg4
+> -- 20. slv_reg19 -> key_reg5
+> -- 21. slv_reg20 -> key_reg6
+> -- 22. slv_reg21 -> key_reg7
+> ------------------------------------------------
+> 
+7a52
+> 	KEY_CNT_G_INIT		: integer;
+19a65,71
+> 		 trigger		:out std_logic;
+> 		-- FE interface
+> 		 fe_key      : in std_logic_vector(255 downto 0);
+> 		 icap_tdata_o        : out std_logic_vector(31 downto 0);
+> 		 icap_abort_o        : out std_logic;
+> 		 icap_tvalid_o       : out std_logic;
+> 		 icap_tready_i       : in std_logic;
+138a191,275
+> 	------------------------------------------------
+> 	---- Signals for leakage resilient AES core 
+> 	--------------------------------------------------
+> 	signal key_cnt_g_int		: integer;
+> 	signal clk_int				: std_ulogic;
+> 	signal rst_int				: std_ulogic;
+> 	signal key_int				: std_ulogic_vector(127 downto 0);  -- AES key
+> 	signal prf_int				: std_ulogic_vector(127 downto 0);  -- Initialization Vector
+> 	signal key_stable_int		: std_ulogic;                       -- write enable for key
+> 	signal prf_stable_int		: std_ulogic;                       -- write enable for IV
+> 	signal data_in_int			: std_ulogic_vector(127 downto 0);  -- authenticated data or plain-/ciphertext or tag input
+> 	signal start_operation_int	: std_ulogic;                       -- process next block
+> 	signal prfmode_int	: std_ulogic;                       -- block is last block (length)
+> 	--signal is_aad_block_int		: std_ulogic;                       -- block is AAD, do not decrypt
+> 	signal encrypt_mode_int		: std_ulogic;                       -- set for decryption -- currently unused, always decrypt
+> 	signal busy_int				: std_ulogic;                      -- core is busy and not accepting data
+> 	signal ready_int			: std_ulogic;                      -- core is initialized and ready for the first/next data block
+> 	signal result_int			: std_ulogic_vector(127 downto 0); -- cipher-/plaintext output
+> 	signal finished_int			: std_ulogic;
+> 	signal tag_valid_int		: std_ulogic;
+> 
+> 	signal load_key_int			: std_logic;
+> 	signal load_iv_int			: std_logic;
+> 	signal start_int			: std_logic;
+> 	signal trigger_int			: std_logic;
+> 	signal error_int            : std_logic;
+> 	signal icap_tdata_int         : std_logic_vector(31 downto 0);
+> 	signal icap_abort_int         : std_logic;
+> 	signal icap_tvalid_int        : std_logic;
+> 	signal icap_tready_int        : std_logic;
+> 	  -- AES interface
+> 	signal aes_data_int          : std_logic_vector(127 downto 0);
+> 	signal aes_data_stb_int      : std_logic;
+> 	--signal aes_tag_valid_int     : std_logic;
+> 	signal tag_invalid_int   : std_logic;
+> 	signal tag_reg	             : std_logic_vector(127 downto 0);
+> 	signal computed_tag_reg	     : std_logic_vector(127 downto 0);
+> 	signal compare_tag_s		 : std_logic;
+> 	signal is_tag_int			 : std_logic;
+> 
+> 
+> -- ICAP data out
+> 	component aes_icap_data is
+> 	port (
+> 	  -- system ports
+> 			 clk_i           : in std_logic;
+> 			 rst_i           : in std_logic;  -- low active, synchronous to clk
+> 											  -- icap controller interface
+> 			 icap_tdata_o         : out std_logic_vector(31 downto 0);
+> 			 icap_abort_o         : out std_logic;
+> 			 icap_tvalid_o        : out std_logic;
+> 			 icap_tready_i        : in std_logic;
+> 	  -- AES interface
+> 			 aes_data_i          : in std_logic_vector(127 downto 0);
+> 			 aes_data_stb_i      : in std_logic;
+> 	  --aes_ready_o         : out std_logic;
+> 			 aes_tag_valid_i    : in std_logic;
+> 			 aes_tag_invalid_i   : in std_logic
+> 	  --aes_error         : out std_logic;
+> 	  --aes_empty         : out std_logic
+> 	);
+> 	end component aes_icap_data;
+> 
+> 	-- Leakage resilient AES
+> 
+> 	component aes_lrprf_streamcipher is
+> 		port (
+> 				 clk_i       : in std_ulogic;
+> 				 rst_i       : in std_ulogic;
+> 				 k_i         : in std_ulogic_vector(127 downto 0);  -- AES key
+> 				 prf_i       : in std_ulogic_vector(127 downto 0);  -- LRPRF input (was iv_i)
+> 				 k_we_i      : in std_ulogic;                       -- write enable for key
+> 				 prf_we_i    : in std_ulogic;                       -- write enable for LRPRF input (was iv_we_i)
+> 				 data_i      : in std_ulogic_vector(127 downto 0);  -- plain-/ciphertext input
+> 				 load_i      : in std_ulogic;                       -- process next block
+> 				 prfmode_i   : in std_ulogic;                       -- set when writing prf_we_i to run prf standalone (was last_i)
+> 			--    aad_i       : in std_ulogic;                       -- block is AAD, do not decrypt
+> 				 decrypt_i   : in std_ulogic;                       -- set for decryption -- currently unused, always decrypt
+> 				 busy_o      : out std_ulogic;                      -- core is busy and not accepting data
+> 				 rdy_o       : out std_ulogic;                      -- core is initialized and ready for the first/next data block
+> 				 data_o      : out std_ulogic_vector(127 downto 0); -- cipher-/plaintext output
+> 				 data_rdy_o  : out std_ulogic
+> 			--    t_valid_o   : out std_ulogic
+> 			 );
+> 	end component aes_lrprf_streamcipher;
+235d371
+< 	      slv_reg1 <= (others => '0');
+244,247d379
+< 	      slv_reg10 <= (others => '0');
+< 	      slv_reg11 <= (others => '0');
+< 	      slv_reg12 <= (others => '0');
+< 	      slv_reg13 <= (others => '0');
+255a388,399
+> 		-- self clearing of start bit  
+> 		elsif(slv_reg0(1) = '1') then
+> 			slv_reg0(1) <= '0';
+> 		-- self clearing of reset bit
+> 		elsif(slv_reg0(2) = '1') then
+> 			slv_reg0(2) <= '0';
+> 		-- self clearing of load key bit
+> 		elsif(slv_reg0(6) = '1') then
+> 			slv_reg0(6) <= '0';
+> 		-- self clearing of load iv bit
+> 		elsif(slv_reg0(7) = '1') then
+> 			slv_reg0(7) <= '0'; 
+268,275d411
+< 	          when b"00001" =>
+< 	            for byte_index in 0 to (C_S_AXI_DATA_WIDTH/8-1) loop
+< 	              if ( S_AXI_WSTRB(byte_index) = '1' ) then
+< 	                -- Respective byte enables are asserted as per write strobes                   
+< 	                -- slave registor 1
+< 	                slv_reg1(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
+< 	              end if;
+< 	            end loop;
+340,371d475
+< 	          when b"01010" =>
+< 	            for byte_index in 0 to (C_S_AXI_DATA_WIDTH/8-1) loop
+< 	              if ( S_AXI_WSTRB(byte_index) = '1' ) then
+< 	                -- Respective byte enables are asserted as per write strobes                   
+< 	                -- slave registor 10
+< 	                slv_reg10(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
+< 	              end if;
+< 	            end loop;
+< 	          when b"01011" =>
+< 	            for byte_index in 0 to (C_S_AXI_DATA_WIDTH/8-1) loop
+< 	              if ( S_AXI_WSTRB(byte_index) = '1' ) then
+< 	                -- Respective byte enables are asserted as per write strobes                   
+< 	                -- slave registor 11
+< 	                slv_reg11(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
+< 	              end if;
+< 	            end loop;
+< 	          when b"01100" =>
+< 	            for byte_index in 0 to (C_S_AXI_DATA_WIDTH/8-1) loop
+< 	              if ( S_AXI_WSTRB(byte_index) = '1' ) then
+< 	                -- Respective byte enables are asserted as per write strobes                   
+< 	                -- slave registor 12
+< 	                slv_reg12(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
+< 	              end if;
+< 	            end loop;
+< 	          when b"01101" =>
+< 	            for byte_index in 0 to (C_S_AXI_DATA_WIDTH/8-1) loop
+< 	              if ( S_AXI_WSTRB(byte_index) = '1' ) then
+< 	                -- Respective byte enables are asserted as per write strobes                   
+< 	                -- slave registor 13
+< 	                slv_reg13(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
+< 	              end if;
+< 	            end loop;
+438d541
+< 	            slv_reg1 <= slv_reg1;
+447,450d549
+< 	            slv_reg10 <= slv_reg10;
+< 	            slv_reg11 <= slv_reg11;
+< 	            slv_reg12 <= slv_reg12;
+< 	            slv_reg13 <= slv_reg13;
+579a679
+> 			-- Warning: Disable read access to key
+581c681
+< 	        reg_data_out <= slv_reg14;
+---
+> 	        reg_data_out <= (others => '0');
+583c683
+< 	        reg_data_out <= slv_reg15;
+---
+> 	        reg_data_out <= (others => '0');
+585c685
+< 	        reg_data_out <= slv_reg16;
+---
+> 	        reg_data_out <= (others => '0');
+587c687
+< 	        reg_data_out <= slv_reg17;
+---
+> 	        reg_data_out <= (others => '0');
+589c689
+< 	        reg_data_out <= slv_reg18;
+---
+> 	        reg_data_out <= (others => '0');
+591c691
+< 	        reg_data_out <= slv_reg19;
+---
+> 	        reg_data_out <= (others => '0');
+593c693
+< 	        reg_data_out <= slv_reg20;
+---
+> 	        reg_data_out <= (others => '0');
+595c695
+< 	        reg_data_out <= slv_reg21;
+---
+> 	        reg_data_out <= (others => '0');
+620a721,915
+> 	-- Instantiation of leakage resislient AES
+> 	aes_lrprf_streamcipher_int : aes_lrprf_streamcipher
+> 	port map (
+> 				 clk_i		 => clk_int,
+> 				 rst_i       => rst_int,
+> 				 k_i         => key_int,
+> 				 prf_i       => prf_int,
+> 				 k_we_i      => key_stable_int,
+> 				 prf_we_i    => prf_stable_int,
+> 				 data_i      => data_in_int,
+> 				 load_i      => start_operation_int,
+> 				 prfmode_i   => prfmode_int,
+> 				 --aad_i       => is_aad_block_int,
+> 				 decrypt_i   => encrypt_mode_int,
+> 				 busy_o      => busy_int,
+> 				 rdy_o       => ready_int,
+> 				 data_o      => result_int,
+> 				 data_rdy_o  => finished_int
+> 				 --t_valid_o   => tag_valid_int
+> 			 );
+> 
+> 	-- instantiation of ICAP data component
+> 	icap_data_inst: aes_icap_data
+> 	port map(
+> 	  -- system ports
+> 			 clk_i      => clk_int,
+> 			 rst_i      => rst_int,											  -- icap controller interface
+> 			 icap_tdata_o       =>icap_tdata_int,
+> 			 icap_abort_o       =>icap_abort_int,
+> 			 icap_tvalid_o      =>icap_tvalid_int,
+> 			 icap_tready_i      =>icap_tready_int,
+> 	  -- AES interface
+> 			 aes_data_i         =>aes_data_int,
+> 			 aes_data_stb_i     =>aes_data_stb_int,
+> 			 aes_tag_valid_i    =>tag_valid_int,
+> 			 aes_tag_invalid_i  =>tag_invalid_int
+> 	  --aes_ready_o         : out
+> 	  --aes_error         : out std_logic;
+> 	  --aes_empty         : out std_logic
+> 	);
+> 
+> 	-- control AES core states
+> 	aes_states: process(S_AXI_ACLK, start_int, finished_int, busy_int, start_operation_int, load_key_int, key_stable_int, load_iv_int, prf_stable_int) is 
+> 	begin
+> 		if(rising_edge(S_AXI_ACLK)) then
+> 			if ((load_key_int = '1') ) then
+> 				key_stable_int          <= '1';
+> 				prf_stable_int          <= '0';
+> 				start_operation_int     <= '0';
+> 				compare_tag_s			<= '0';
+> 			elsif ((key_stable_int = '1')) then
+> 				key_stable_int          <= '0';
+> 				prf_stable_int          <= '0';
+> 				start_operation_int     <= '0';
+> 				compare_tag_s			<= '0';
+> 			elsif ((load_iv_int = '1') ) then
+> 				key_stable_int          <= '0';
+> 				prf_stable_int          <= '1';
+> 				start_operation_int     <= '0';
+> 				compare_tag_s			<= '0';
+> 			elsif ((prf_stable_int = '1')) then
+> 				key_stable_int          <= '0';
+> 				prf_stable_int          <= '0';
+> 				start_operation_int     <= '0';
+> 				compare_tag_s			<= '0';
+> 			elsif ((start_int = '1') ) then
+> 				key_stable_int          <= '0';
+> 				prf_stable_int          <= '0';
+> 				start_operation_int     <= '1';
+> 				compare_tag_s			<= '0';
+> 			elsif ((start_operation_int = '1')) then
+> 				key_stable_int          <= '0';
+> 				prf_stable_int          <= '0';
+> 				start_operation_int     <= '0';
+> 				compare_tag_s			<= '0';
+> 			else
+> 				key_stable_int          <= '0';
+> 				prf_stable_int          <= '0';
+> 				start_operation_int     <= '0';
+> 				compare_tag_s			<= '0';
+> 			end if;
+> 		end if;
+> 	end process;
+> 
+> 
+> 	-- generate trigger signal for the duration of enc/dec opperation
+> 	process (S_AXI_ACLK, start_operation_int, rst_int, finished_int )
+> 	begin
+> 		if rising_edge(S_AXI_ACLK) then
+> 			if S_AXI_ARESETN = '0' then
+> 				trigger_int <= '0';
+> 			else
+> 				if (start_int = '1') then
+> 					trigger_int <= '1';
+> 				elsif ((finished_int = '1') AND  (trigger_int ='1')) then
+> 					trigger_int <= '0';
+> 				else
+> 					trigger_int <= trigger_int;
+> 				end if;
+> 			end if;
+> 		end if;
+> 	end process;
+> 
+> 
+> 	-- Warning: Remove writing of decrypted data to out_reg
+> 	out_temp: process(S_AXI_ACLK, finished_int, tag_valid_int, busy_int) is
+> 	begin
+> 		if(rising_edge(S_AXI_ACLK)) then
+> 			if S_AXI_ARESETN = '0' or rst_int ='1'then
+> 				slv_reg1 <= (others => '0');
+> 				slv_reg10 <= (others => '0');
+> 				slv_reg11 <= (others => '0');
+> 				slv_reg12 <= (others => '0');
+> 				slv_reg13 <= (others => '0');
+> 				computed_tag_reg	  <= (others => '0');
+> 			else
+> 				if (finished_int = '1' and prfmode_int = '0' ) then
+> 					slv_reg1(0) <= finished_int;
+> 					slv_reg1(1) <= busy_int;
+> 					slv_reg1(2) <= tag_valid_int;
+> 					slv_reg1(31 downto 3) <= (others => '0');
+> 					slv_reg10	  <= TO_STDLOGICVECTOR(result_int(127 downto 96)); 
+> 					slv_reg11 	  <= TO_STDLOGICVECTOR(result_int(95 downto 64));
+> 					slv_reg12 	  <= TO_STDLOGICVECTOR(result_int(63 downto 32));
+> 					slv_reg13 	  <= TO_STDLOGICVECTOR(result_int(31 downto 0));
+> 				elsif (finished_int = '1' and prfmode_int = '1' ) then
+> 					slv_reg1(0) <= finished_int;
+> 					slv_reg1(1) <= busy_int;
+> 					slv_reg1(2) <= tag_valid_int;
+> 					slv_reg1(31 downto 3) <= (others => '0');
+> 					slv_reg10	  <= TO_STDLOGICVECTOR(result_int(127 downto 96)); 
+> 					slv_reg11 	  <= TO_STDLOGICVECTOR(result_int(95 downto 64));
+> 					slv_reg12 	  <= TO_STDLOGICVECTOR(result_int(63 downto 32));
+> 					slv_reg13 	  <= TO_STDLOGICVECTOR(result_int(31 downto 0));
+> 					computed_tag_reg	  <= TO_STDLOGICVECTOR(result_int);
+> 				else 
+> 					slv_reg1(0) <= finished_int;
+> 					slv_reg1(1) <= busy_int;
+> 					slv_reg1(2) <= tag_valid_int;
+> 					slv_reg1(31 downto 3) <= (others => '0');
+> 					computed_tag_reg	  <= computed_tag_reg;
+> 					slv_reg1(31 downto 3) <= (others => '0');
+> 				end if;
+> 			end if;
+> 		end if;
+> 	end process;
+> 
+> 	tag_valid_p: process (S_AXI_ACLK, rst_int, compare_tag_s)
+> 	begin
+> 		if rising_edge(S_AXI_ACLK) then
+> 			if S_AXI_ARESETN = '0' or rst_int ='1' then
+> 				tag_valid_int <= '0';
+> 				tag_invalid_int <= '0' ;
+> 			else
+> 				if (is_tag_int= '1' and prfmode_int ='1') then
+> 					if(tag_reg = computed_tag_reg) then
+> 						tag_valid_int <= '1';
+> 						tag_invalid_int <= '0';
+> 					elsif(tag_reg /= computed_tag_reg) then
+> 						tag_invalid_int <= '1' ;
+> 						tag_valid_int <= '0';
+> 					end if;
+> 				else
+> 					tag_valid_int <= tag_valid_int;
+> 					tag_invalid_int <= tag_invalid_int;
+> 				end if;
+> 			end if;
+> 		end if;
+> 	end process;
+> 
+> 	aes_data_int        <= std_logic_vector(result_int);
+> 	aes_data_stb_int    <= '0' when prfmode_int = '1' else finished_int;
+> 
+> 	clk_int             <= S_AXI_ACLK;
+> 	key_int             <= TO_STDULOGICVECTOR(fe_key(255 downto 128))  when  prfmode_int ='1' else TO_STDULOGICVECTOR(fe_key(127 downto 0));
+> 	prf_int              <= TO_STDULOGICVECTOR(slv_reg6 & slv_reg7 & slv_reg8 & slv_reg9);
+> 	data_in_int         <= TO_STDULOGICVECTOR(slv_reg2 & slv_reg3 & slv_reg4 & slv_reg5);
+> 
+> 	encrypt_mode_int    <= slv_reg0(0);
+> 	start_int           <= slv_reg0(1);
+> 	is_tag_int			<= slv_reg0(3);
+> 	prfmode_int			<= slv_reg0(4);
+> 	load_key_int        <= slv_reg0(6);
+> 	load_iv_int         <= slv_reg0(7);
+> 
+> 	rst_int             <= not(S_AXI_ARESETN) or slv_reg0(2);
+> 
+> 	trigger             <= trigger_int;  
+> 
+> 	-- PR controller interface
+> 	icap_tdata_o		<= icap_tdata_int;
+> 	icap_abort_o		<= icap_abort_int;
+> 	icap_tvalid_o		<=  '0' when prfmode_int = '1' else icap_tvalid_int; --icap_tvalid_int;
+> 	icap_tready_int		<= icap_tready_i;
+> 	tag_reg				<= slv_reg2 & slv_reg3 & slv_reg4 & slv_reg5 when (prfmode_int = '1' and is_tag_int = '1') else (others => '0');

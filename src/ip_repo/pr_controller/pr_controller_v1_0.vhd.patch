@@ -1,0 +1,143 @@
+4a5,49
+> Library UNISIM;
+> use UNISIM.vcomponents.all;
+> -- ICAP Controller IP Register description
+> ---------------------------------------------------------------------------
+> -- Register   Offset       Range     Access   Description
+> ---------------------------------------------------------------------------
+> -- STAT       0x00000000                      Status Register
+> --                         [31:13]   ro       reserved
+> --                         [12:5]    ro       fsm state
+> --                         [4]       ro       ctw (clear to write)
+> --                         [3:0]     ro       icap status
+> -- Reg 1      0x00000004
+> --                         [31:0]    ro       reserved
+> -- Reg 2      0x00000008
+> --                         [31:0]    ro       reserved
+> -- Reg 3      0x0000000c
+> --                         [31:0]    ro       reserved
+> 
+> --! @brief PR Controller IP Wrapper entity
+> --! 
+> --! @detail
+> --! <B>A. AXI Slave Bus Interface description:</B>
+> --!
+> --! (Copy of the entity documentation of pr_controller_v1_0_S00_AXI)
+> --!
+> --! @copydetails pr_controller_v1_0_S00_AXI
+> --!
+> --! For more details about the interface, see AMBA AXI4 Bus description at http://www.arm.com
+> --!
+> --! <B>B. External data interface description:</B>
+> --!
+> --! Full data transfer, option 1:
+> --! \image html signaldiag_data_interface_full_data_transfer_0.svg
+> --! \image latex signaldiag_data_interface_full_data_transfer_0.eps
+> --!
+> --! Full data transfer, option 2:
+> --! \image html signaldiag_data_interface_full_data_transfer_1.svg
+> --! \image latex signaldiag_data_interface_full_data_transfer_1.eps
+> --!
+> --! Aborting a data transfer:
+> --! \image html signaldiag_data_interface_abort_a_data_transfer.svg
+> --! \image latex signaldiag_data_interface_abort_a_data_transfer.eps
+> --!
+> --! 
+> 
+18a64,67
+> 		tdata           : in std_logic_vector(31 downto 0); --! Data input
+>        	abort           : in std_logic;                     --! Abort running configuration
+>        	tvalid          : in std_logic;                     --! Input data valid
+>        	tready          : out std_logic;                    --! Ready to write data to ICAP
+57a107,109
+> 		pr_controller_status_icap   : in std_logic_vector(3 downto 0);
+>       	pr_controller_status_fsm    : in std_logic_vector(7 downto 0);
+>       	pr_controller_tready        : in std_logic;
+80a133,165
+>    --! @brief Component declaration of the PR contoller's state machine module
+>    component pr_controller is
+>       generic(
+>          counterRegWidth_gen    : integer := 16);
+>       port(
+>          -- System signals
+>          reset                   : in std_logic;                      -- low-active
+>          clk                     : in std_logic;                      -- clock 
+>          -- data interface
+>          tdata                   : in std_logic_vector(31 downto 0);  -- data word 0 (low)
+>          abort                   : in std_logic;                      -- abort configuration
+>          tvalid                  : in std_logic;                      -- input data valid
+>          tready                  : out std_logic;                     -- ready to write data to ICAPE
+>          -- cpu
+>          status_icap             : out std_logic_vector(3 downto 0);  -- bits [7:4] of 'icap_o' input port 
+>          status_fsm              : out std_logic_vector(7 downto 0);  -- FSM state
+>          -- ICAPE2 interface
+>          icap_o                  : in std_logic_vector(31 downto 0);  -- ICAPE2 Configuration data output bus
+>          icap_clk                : out std_logic;                     -- ICAPE2 Clock Input                    
+>          icap_i                  : out std_logic_vector(31 downto 0); -- ICAPE2 Active-Low ICAP Enable         
+>          icap_csib               : out std_logic;                     -- ICAPE2 Configuration data input bus  
+>          icap_rdwrb              : out std_logic);                    -- ICAPE2 Read/Write Select input       
+>    end component pr_controller;
+>    
+>    --! @name Signals driven by pr_controller
+>    signal prController_tready     : std_logic;
+>    signal prController_statusIcap : std_logic_vector(3 downto 0);
+>    signal prController_statusFsm  : std_logic_vector(7 downto 0);
+>    signal icape2_o                  : std_logic_vector(31 downto 0);
+>    signal prController_icapClk    : std_logic;
+>    signal prController_icapI      : std_logic_vector(31 downto 0);
+>    signal prController_csib       : std_logic;
+>    signal prController_rdwrb      : std_logic;
+90a176,178
+> 		pr_controller_status_icap => prController_statusIcap,
+>       	pr_controller_status_fsm  => prController_statusFsm,
+>       	pr_controller_tready      => prController_tready,
+114a203,249
+>    --! @brief Contains the state machine of the PR Controller IP
+>    --!
+>    --! @detail
+>    --! The module receives data from the data interface and passes it to ICAPE2.
+>    --! The internal state of the FSM and the ICAP2 is displayed at the output ports
+>    --! status_icap and status_fsm.
+>    pr_controller_inst : pr_controller
+>    generic map(
+>       counterRegWidth_gen     => 10
+>    )
+>    port map(
+>       -- system signals
+>       reset                   => s00_axi_aresetn,
+>       clk                     => s00_axi_aclk,
+>       -- cpu
+>       tdata                   => tdata,
+>       abort                   => abort,
+>       tvalid                  => tvalid,
+>       tready                  => prController_tready,
+>       status_icap             => prController_statusIcap,
+>       status_fsm              => prController_statusFsm,
+>       -- icap
+>       icap_o                  => icape2_o,
+>       icap_clk                => prController_icapClk,
+>       icap_i                  => prController_icapI,
+>       icap_csib               => prController_csib,
+>       icap_rdwrb              => prController_rdwrb
+>    );
+> 
+>    --! @brief Explicit instantiation of the device's ICAPE2 primitive
+>    --!
+>    --! @detail ICAPE2 is a HW primitive to access the Internal Configuration Access Port.
+>    --! This is device dependent hardware. Contained in Xilinx's UNISIM.vcomponents library.
+>    --! 
+>    --! For more information use the Xilinx HDL Libraries Guide, version 2015.4
+>    ICAPE2_inst : ICAPE2
+>    generic map (
+>       DEVICE_ID => X"03651093",         -- Specifies the pre-programmed Device ID value to be used for simulation purposes.
+>       ICAP_WIDTH => "X32",              -- Specifies the input and output data width.
+> 					SIM_CFG_FILE_NAME => "None")      -- Specifies the Raw Bitstream (RBT) file to be parsed by the simulation model.
+>    port map (
+>       O      => icape2_o,               -- 32-bit output: Configuration data output bus
+>       CLK    => prController_icapClk, -- 1-bit input: Clock Input
+>       CSIB   => prController_csib,    -- 1-bit input: Active-Low ICAP Enable
+>       I      => prController_icapI,   -- 32-bit input: Configuration data input bus
+>       RDWRB  => prController_rdwrb);  -- 1-bit input: Read/Write Select input
+>    -- End of ICAPE2_inst instantiation
+115a251
+>    tready        <= prController_tready;

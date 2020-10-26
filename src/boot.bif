@@ -1,0 +1,5 @@
+image: {
+[bootloader] images/fsbl.elf
+images/config_blank.bit
+images/u-boot.elf
+}

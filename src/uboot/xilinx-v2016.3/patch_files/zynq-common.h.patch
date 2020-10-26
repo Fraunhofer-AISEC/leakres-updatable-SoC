@@ -1,0 +1,155 @@
+202a203,210
+> 
+> 
+> /* RAM
+> 
+> 	bitstream_addr = 0x03000000
+> 
+>  */
+> 
+206d213
+< 	"ethaddr=00:0a:35:00:01:22\0"	\
+208c215
+< 	"kernel_load_address=0x2080000\0" \
+---
+> 	"kernel_load_address=0x03000000\0" \
+210c217
+< 	"ramdisk_load_address=0x4000000\0"	\
+---
+> 	"ramdisk_load_address=0x04000000\0"	\
+212c219
+< 	"devicetree_load_address=0x2000000\0"	\
+---
+> 	"devicetree_load_address=0x01000300\0"	\
+223,230c230,300
+< 	"bootenv=uEnv.txt\0" \
+< 	"loadbootenv=load mmc 0 ${loadbootenv_addr} ${bootenv}\0" \
+< 	"importbootenv=echo Importing environment from SD ...; " \
+< 		"env import -t ${loadbootenv_addr} $filesize\0" \
+< 	"sd_uEnvtxt_existence_test=test -e mmc 0 /uEnv.txt\0" \
+< 	"preboot=if test $modeboot = sdboot && env run sd_uEnvtxt_existence_test; " \
+< 			"then if env run loadbootenv; " \
+< 				"then env run importbootenv; " \
+---
+> 	"decpr_config=" \
+> 		"if decrypt_pr ${bitstream_addr}; then " \
+> 			"echo \"Configuration of partial bitstream successful\"; " \
+> 		"else " \
+> 			"echo \"Configuration failed\"; " \
+> 		"fi\0" \
+> 	"decpr_demo=" \
+> 		"bitstream_addr=0x03000000; " \
+> 		"setenv exit_main false; " \
+> 		"while test ${exit_main} != true; do " \
+> 			"setenv exit_main true; " \
+> 			"echo \"----------------------------------\"; " \
+> 			"echo \"--  Secure Update Demonstrator  --\"; " \
+> 			"echo \"----------------------------------\"; " \
+> 			"echo \"Main menu:\"; " \
+> 			"echo \"  0: secure update of partial reconfigurable modules\"; " \
+> 			"echo \"  1: exit\"; " \
+> 			"askenv user_in \"(Enter option to be run):\" 1; " \
+> 			"if test ${user_in} = 0; then " \
+> 				"run secure_update_demo; " \
+> 			"elif test ${user_in} = 1; then " \
+> 			"else " \
+> 				"echo \"Error: Invalid input\"; " \
+> 				"setenv exit_main false; " \
+> 			"fi; " \
+> 		"done; " \
+> 		"echo \"Exit to terminal...\"; " \
+> 		"\0" \
+> 	"secure_update_demo=" \
+> 		"setenv exit_demo false; " \
+> 		"while test ${exit_demo} != true; do " \
+> 			"echo \"\"; " \
+> 			"echo \"Enter partial configuration to be loaded (0-3)\"; " \
+> 			"echo \"  0: partial bitstream 0 \"; " \
+> 			"echo \"  1: partial bitstream 1 \"; " \
+> 			"echo \"  2: partial bitstream 2 \"; " \
+> 			"echo \"  3: blank bitstream  \"; " \
+> 			"echo \"  4: exit demo\"; " \
+> 			"askenv user_in \"(Enter Config to be loaded):\" 1; " \
+> 			"if test ${user_in} = 0; then " \
+> 				"echo \"Loading encrypted partial configuration 0\"; " \
+> 				"if fatload mmc 0 ${bitstream_addr} p_c00_enc.bin; then " \
+> 					"run decpr_config; " \
+> 				"else " \
+> 					"echo \"Error: Can not copy p_c00_enc.bin to RAM\"; " \
+> 				"fi; " \
+> 			"elif test ${user_in} = 1; then " \
+> 				"echo \"Loading encrypted partial configuration 1\"; " \
+> 				"if fatload mmc 0 ${bitstream_addr} p_c01_enc.bin; then " \
+> 					"run decpr_config; " \
+> 				"else " \
+> 					"echo \"Error: Can not copy p_c01_enc.bin to RAM\"; " \
+> 				"fi; " \
+> 			"elif test ${user_in} = 2; then " \
+> 				"echo \"Loading encrypted partial configuration 2\"; " \
+> 				"if fatload mmc 0 ${bitstream_addr} p_c02_enc.bin; then " \
+> 					"run decpr_config; " \
+> 				"else " \
+> 					"echo \"Error: Can not copy p_c02_enc.bin to RAM\"; " \
+> 				"fi; " \
+> 			"elif test ${user_in} = 3; then " \
+> 				"echo \"Loading encrypted blank partial configuration?\"; " \
+> 				"if fatload mmc 0 ${bitstream_addr} p_blank_enc.bin; then " \
+> 					"run decpr_config; " \
+> 				"else " \
+> 					"echo \"Error: Can not copy p_blank_enc.bin to RAM\"; " \
+> 				"fi; " \
+> 			"elif test ${user_in} = 4; then " \
+> 				"setenv exit_demo true; " \
+> 			"else " \
+> 				"echo \"Error: Invalid input\"; " \
+232c302,303
+< 		"fi; \0" \
+---
+> 		"done; " \
+> 		"\0" \
+250,258d320
+< 	"uenvboot=" \
+< 		"if run loadbootenv; then " \
+< 			"echo Loaded environment from ${bootenv}; " \
+< 			"run importbootenv; " \
+< 		"fi; " \
+< 		"if test -n $uenvcmd; then " \
+< 			"echo Running uenvcmd ...; " \
+< 			"run uenvcmd; " \
+< 		"fi\0" \
+260,273c322
+< 			"run uenvboot; " \
+< 			"echo Copying Linux from SD to RAM... && " \
+< 			"load mmc 0 ${kernel_load_address} ${kernel_image} && " \
+< 			"load mmc 0 ${devicetree_load_address} ${devicetree_image} && " \
+< 			"load mmc 0 ${ramdisk_load_address} ${ramdisk_image} && " \
+< 			"bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}; " \
+< 		"fi\0" \
+< 	"usbboot=if usb start; then " \
+< 			"run uenvboot; " \
+< 			"echo Copying Linux from USB to RAM... && " \
+< 			"load usb 0 ${kernel_load_address} ${kernel_image} && " \
+< 			"load usb 0 ${devicetree_load_address} ${devicetree_image} && " \
+< 			"load usb 0 ${ramdisk_load_address} ${ramdisk_image} && " \
+< 			"bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}; " \
+---
+> 			"run decpr_demo; " \
+275,285d323
+< 	"nandboot=echo Copying Linux from NAND flash to RAM... && " \
+< 		"nand read ${kernel_load_address} 0x100000 ${kernel_size} && " \
+< 		"nand read ${devicetree_load_address} 0x600000 ${devicetree_size} && " \
+< 		"echo Copying ramdisk... && " \
+< 		"nand read ${ramdisk_load_address} 0x620000 ${ramdisk_size} && " \
+< 		"bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}\0" \
+< 	"jtagboot=echo TFTPing Linux to RAM... && " \
+< 		"tftpboot ${kernel_load_address} ${kernel_image} && " \
+< 		"tftpboot ${devicetree_load_address} ${devicetree_image} && " \
+< 		"tftpboot ${ramdisk_load_address} ${ramdisk_image} && " \
+< 		"bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}\0" \
+314c352
+< #define CONFIG_BOOTCOMMAND		"run $modeboot"
+---
+> #define CONFIG_BOOTCOMMAND		"run sdboot"
+392a431,432
+> 
+> #define CONFIG_CMD_ASKENV

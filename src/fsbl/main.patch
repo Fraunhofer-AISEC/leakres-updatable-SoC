@@ -1,0 +1,26 @@
+126c126
+< 
+---
+> #define FSBL_DEBUG
+140a141,144
+> // PUF key reproduction
+> #include "fuzzy_key_commitment.h"
+> 
+> 
+577a582,583
+> 
+> 
+790a797,809
+> 
+> 		/*
+> 		 * PUF key reproduction and lock?
+> 		 * */
+> 		RETURN_CODE ret;
+> 		ret = fkc_reproduction();
+> 		    if(ret != SUCCESS)
+> 		    {
+> 		    	printf("key reproduction failed\n\r");
+> 		    	return ret;
+> 		    }
+> 		printf("FSBL: Key reproduction success\n\r");
+> 		/*end of customization*/
