@@ -268,7 +268,7 @@ ifeq ($(IP_CORE),LRAES_OFB_GMAC)
 
 else ifeq ($(IP_CORE),LRAEAD_STREAMCIPHER)
 	$(info encryption script can be found at src/src/leakres-aead-host/)
-	$(info build instructions can be found in src/src/leakres-aead-host/Readme.md)
+	$(info build instructions can be found in src/leakres-aead-host/Readme.md)
 	$(info Usage: ./tests/lraead_test <aadfile.bin> <images/p_c01.bin> <keys.bin> <nonce.bin> <sdcards/p_c00_enc.bin>)
 endif
 
